@@ -1,23 +1,20 @@
 import type { Mode, ImageSize, ChatMessage } from '@/store/useStore';
 
 /**
- * 部署到 Cloudflare Pages 后，所有 Agnes API 请求都走同源反向代理：
- *   /api/agnes/*  →  functions/api/agnes/[[path]].ts
- *                    →  https://apihub.agnes-ai.com/*
+ * Agnes API 调用（直连模式）
  *
- * 优点：
- *   - API key 不在前端 bundle（安全）
- *   - 避开浏览器 CORS 限制
- *   - 支持流式响应透传
- *
- * 本地 dev（无 CF 反代）会直接打 404；如需本地调试，把 BASE_URL 改回
- *   'https://apihub.agnes-ai.com' 即可。
+ * 历史说明：
+ *   - 之前尝试走 CF Pages Functions 反代（/api/agnes/*），但 Pages Functions
+ *     在多次部署/项目类型识别上不稳定，目前改回直连模式。
+ *   - 如果以后要恢复反代，把 BASE_URL 改回 '/api/agnes'，并部署 functions/。
  */
-const BASE_URL = '/api/agnes';
+const BASE_URL = 'https://apihub.agnes-ai.com';
 
-// 客户端不再持有 API key（key 在 CF Pages Function 环境变量中注入）
+const API_KEY = 'sk-8fRJIZOlfLqL7G6MjKrJkjU2LRQFs6qrr1x9uSk2N9WnvzbX';
+
 const headers: Record<string, string> = {
   'Content-Type': 'application/json',
+  'Authorization': `Bearer ${API_KEY}`,
 };
 
 // ============ 图片生成 ============

@@ -111,20 +111,28 @@ async function tryWriteToDirectory(url: string, filename: string): Promise<strin
     for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
     blob = new Blob([ab], { type: mime });
   } else {
-    // 优先通过本地代理获取（避免 CORS）
+    // 优先尝试直接 fetch（CORS 失败则用代理 fallback）
+    let proxyWorked = false;
     try {
-      const proxyUrl = `/__download?url=${encodeURIComponent(url)}`;
-      const response = await fetch(proxyUrl, { cache: 'no-cache' });
-      if (!response.ok) return null;
-      blob = await response.blob();
-      if (!blob || blob.size === 0) return null;
+      const response = await fetch(url, { cache: 'no-cache' });
+      if (response.ok) {
+        blob = await response.blob();
+        if (blob && (blob.size > 0 || blob.type)) {
+          proxyWorked = true;
+        }
+      }
     } catch {
-      // 代理失败 → 尝试直接 fetch
+      // CORS / 网络错误 → 用代理
+    }
+
+    if (!proxyWorked) {
+      // 回退到本地代理
       try {
-        const response = await fetch(url, { cache: 'no-cache' });
+        const proxyUrl = `/api/__download?url=${encodeURIComponent(url)}`;
+        const response = await fetch(proxyUrl, { cache: 'no-cache' });
         if (!response.ok) return null;
         blob = await response.blob();
-        if (!blob || (blob.size === 0 && !blob.type)) return null;
+        if (!blob || blob.size === 0) return null;
       } catch {
         return null;
       }
