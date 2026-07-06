@@ -1,6 +1,6 @@
 // POST /api/agnes/v1/chat/completions
 
-import { proxy, preflight, type Env } from '../_proxy';
+import { proxy, preflight, type Env } from '../proxy';
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   return proxy(request, env, '/v1/chat/completions');
