@@ -63,6 +63,10 @@ interface AppState {
   resultImageUrl: string | null;
   resultVideoUrl: string | null;
   videoPollingId: number | null;
+  /** 视频生成进度（0-100），用于 UI 显示 */
+  videoProgress: number | null;
+  /** 视频生成状态文本（queued/in_progress/completed/failed） */
+  videoStatus: string | null;
   error: string | null;
   /** 作品库：所有生成过的作品都进入这里（持久化到 localStorage） */
   history: HistoryItem[];
@@ -92,6 +96,7 @@ interface AppState {
   setResultImageUrl: (url: string | null) => void;
   setResultVideoUrl: (url: string | null) => void;
   setVideoPollingId: (id: number | null) => void;
+  setVideoProgress: (progress: number | null, status: string | null) => void;
   setError: (err: string | null) => void;
 
   // 作品库相关
@@ -154,6 +159,8 @@ export const useStore = create<AppState>((set) => ({
   resultImageUrl: null,
   resultVideoUrl: null,
   videoPollingId: null,
+  videoProgress: null,
+  videoStatus: null,
   error: null,
   /** 作品库：store 初始化时同步从 localStorage 读取，避免刷新后变 0 件 */
   history: loadInitialHistory(),
@@ -180,6 +187,7 @@ export const useStore = create<AppState>((set) => ({
   setResultImageUrl: (url) => set({ resultImageUrl: url }),
   setResultVideoUrl: (url) => set({ resultVideoUrl: url }),
   setVideoPollingId: (id) => set({ videoPollingId: id }),
+  setVideoProgress: (progress, status) => set({ videoProgress: progress, videoStatus: status }),
   setError: (err) => set({ error: err }),
 
   addToHistory: (item) =>

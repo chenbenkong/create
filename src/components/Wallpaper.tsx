@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useSettings } from '@/store/useSettings';
 
 /**
  * 每日壁纸背景
@@ -31,8 +32,12 @@ function pickToday(): string {
 
 export default function Wallpaper() {
   const bgRef = useRef<HTMLDivElement>(null);
+  const { wallpaperEnabled, reduceMotion } = useSettings();
   // 初始即给一个 URL，避免首屏空白；后续 <img> 预加载失败时降级到下一张
   const [bgUrl, setBgUrl] = useState<string>(() => pickToday());
+
+  // 壁纸开关关闭时不渲染任何内容
+  if (!wallpaperEnabled) return null;
 
   // 预加载：若当前图加载失败，自动切到下一张（控制台无错误噪音）
   useEffect(() => {
@@ -48,7 +53,9 @@ export default function Wallpaper() {
   }, [bgUrl]);
 
   // 极轻鼠标视差：8px 内移动，仅修改 backgroundPosition，不触发 React 重渲染
+  // reduceMotion 开启时禁用
   useEffect(() => {
+    if (reduceMotion) return;
     const el = bgRef.current;
     if (!el) return;
     let raf = 0;

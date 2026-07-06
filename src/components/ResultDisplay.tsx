@@ -5,17 +5,19 @@ import GenerationLoader from '@/components/GenerationLoader';
 import { downloadFromUrl } from '@/utils/download';
 
 export default function ResultDisplay() {
-  const { resultImageUrl, resultVideoUrl, isGenerating, error, mode } = useStore();
+  const { resultImageUrl, resultVideoUrl, isGenerating, error, mode, videoProgress, videoStatus } = useStore();
   const isVideo = isVideoMode(mode);
   const [isDownloading, setIsDownloading] = useState(false);
 
   const handleDownload = useCallback(async (url: string, kind: 'image' | 'video') => {
     setIsDownloading(true);
+    // 即时反馈：点击瞬间就提示，避免用户以为卡住
+    useStore.getState().setToast({ kind: 'info', message: '正在下载，请稍候…' });
     try {
-      await downloadFromUrl(url, {
+      const result = await downloadFromUrl(url, {
         filenamePrefix: kind === 'video' ? '工坊-影像' : '工坊-图像',
       });
-      useStore.getState().setToast({ kind: 'success', message: '已开始下载，请查看浏览器下载文件夹' });
+      useStore.getState().setToast({ kind: 'success', message: `下载成功，请查看「${result.savedTo}」` });
     } catch (err) {
       const msg = err instanceof Error ? err.message : '未知错误';
       useStore.getState().setToast({ kind: 'error', message: `下载失败：${msg}` });
@@ -39,6 +41,19 @@ export default function ResultDisplay() {
 
   if (isGenerating) {
     const text = isVideo ? '正在生成影像' : mode === 'text2img' ? '正在生成图像' : '正在生成';
+    // 视频状态中文映射
+    const statusLabel = (() => {
+      if (!isVideo || !videoStatus) return null;
+      const map: Record<string, string> = {
+        queued: '排队中',
+        in_progress: '生成中',
+        processing: '处理中',
+        success: '即将完成',
+        completed: '已完成',
+        failed: '失败',
+      };
+      return map[videoStatus] || videoStatus;
+    })();
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-8">
         <GenerationLoader mode={isVideo ? 'video' : 'image'} />
@@ -47,6 +62,26 @@ export default function ResultDisplay() {
           <p className="font-display italic text-lg text-paper-50">
             {text}<span className="cursor-blink" />
           </p>
+          {isVideo && videoProgress !== null && (
+            <div className="flex flex-col items-center gap-2 mt-2">
+              <div className="flex items-baseline gap-3">
+                <span className="font-display text-3xl text-umber tabular-nums">
+                  {videoProgress}<span className="text-base text-paper-200">%</span>
+                </span>
+                {statusLabel && (
+                  <span className="text-[10px] text-paper-200 font-mono tracking-widest uppercase">
+                    {statusLabel}
+                  </span>
+                )}
+              </div>
+              <div className="w-48 h-px bg-paper-50/15 relative overflow-hidden">
+                <div
+                  className="absolute inset-y-0 left-0 bg-umber transition-all duration-700"
+                  style={{ width: `${videoProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-center gap-3">
             <span className="w-1 h-1 rounded-full bg-umber animate-ticker" />
             <span className="text-[10px] text-paper-200 font-mono tracking-widest">
@@ -78,10 +113,13 @@ export default function ResultDisplay() {
         <button
           onClick={() => handleDownload(resultVideoUrl, 'video')}
           disabled={isDownloading}
-          className="btn-primary flex items-center gap-2.5 text-xs tracking-widest"
+          className="btn-primary flex items-center gap-2.5 text-xs tracking-widest transition-all duration-300"
+          style={isDownloading ? { opacity: 0.7, transform: 'scale(0.98)' } : undefined}
         >
-          {isDownloading ? <Loader2 size={12} className="animate-spin" /> : <ArrowDownToLine size={12} strokeWidth={1.5} />}
-          <span>{isDownloading ? '下载中' : '下载到本地'}</span>
+          {isDownloading
+            ? <Loader2 size={12} className="animate-spin text-umber" />
+            : <ArrowDownToLine size={12} strokeWidth={1.5} />}
+          <span>{isDownloading ? '正在下载…' : '下载到本地'}</span>
         </button>
       </div>
     );
@@ -105,10 +143,13 @@ export default function ResultDisplay() {
         <button
           onClick={() => handleDownload(resultImageUrl, 'image')}
           disabled={isDownloading}
-          className="btn-primary flex items-center gap-2.5 text-xs tracking-widest"
+          className="btn-primary flex items-center gap-2.5 text-xs tracking-widest transition-all duration-300"
+          style={isDownloading ? { opacity: 0.7, transform: 'scale(0.98)' } : undefined}
         >
-          {isDownloading ? <Loader2 size={12} className="animate-spin" /> : <ArrowDownToLine size={12} strokeWidth={1.5} />}
-          <span>{isDownloading ? '下载中' : '下载到本地'}</span>
+          {isDownloading
+            ? <Loader2 size={12} className="animate-spin text-umber" />
+            : <ArrowDownToLine size={12} strokeWidth={1.5} />}
+          <span>{isDownloading ? '正在下载…' : '下载到本地'}</span>
         </button>
       </div>
     );

@@ -1,6 +1,7 @@
 import { useCallback, useRef, useEffect, useState } from 'react';
 import { useStore, type ChatMessage } from '@/store/useStore';
 import { sendChatMessage } from '@/utils/api';
+import { useSettings } from '@/store/useSettings';
 import { Trash2, ImagePlus, X, Loader2, ArrowUp, Download } from 'lucide-react';
 import { downloadText } from '@/utils/download';
 
@@ -46,9 +47,13 @@ export default function ChatPanel() {
 
     try {
       const messagesToSend = [...chatMessages, userMsg];
-      await sendChatMessage(messagesToSend, imageToSend, (fullText) => {
-        updateLastAssistantMessage(fullText);
-      });
+      const { chatModel, chatSystemPrompt } = useSettings.getState();
+      await sendChatMessage(
+        messagesToSend,
+        imageToSend,
+        (fullText) => { updateLastAssistantMessage(fullText); },
+        { model: chatModel, systemPrompt: chatSystemPrompt }
+      );
     } catch (err) {
       updateLastAssistantMessage(
         `出错了：${err instanceof Error ? err.message : '未知错误'}`

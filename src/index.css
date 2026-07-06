@@ -299,3 +299,12 @@ body {
     transform: scale(0.8);
   }
 }
+
+/* ============ 减弱动效（设置开关） ============ */
+body.reduce-motion *,
+body.reduce-motion *::before,
+body.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}

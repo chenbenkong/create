@@ -28,7 +28,6 @@ export default function ArchivePage() {
   const navigate = useNavigate();
   const {
     history,
-    setResultImageUrl, setResultVideoUrl,
     removeFromHistory, updateHistoryItem, clearHistory,
   } = useStore();
   const [filter, setFilter] = useState<Filter>('all');
@@ -56,18 +55,18 @@ export default function ArchivePage() {
   }), [history]);
 
   const handleOpen = (item: HistoryItem) => {
-    if (item.isVideo) setResultVideoUrl(item.imageUrl);
-    else setResultImageUrl(item.imageUrl);
-    navigate('/');
+    navigate(`/archive/${item.id}`);
   };
 
   const handleDownload = async (e: React.MouseEvent, item: HistoryItem) => {
     e.stopPropagation();
+    useStore.getState().setToast({ kind: 'info', message: '正在下载，请稍候…' });
     try {
-      await downloadFromUrl(item.imageUrl, {
+      const result = await downloadFromUrl(item.imageUrl, {
         filenamePrefix: item.isVideo ? '工坊-影像' : '工坊-图像',
+        title: item.title,
       });
-      useStore.getState().setToast({ kind: 'success', message: '已开始下载' });
+      useStore.getState().setToast({ kind: 'success', message: `下载成功，请查看「${result.savedTo}」` });
     } catch (err) {
       const msg = err instanceof Error ? err.message : '未知错误';
       useStore.getState().setToast({ kind: 'error', message: `下载失败：${msg}` });
@@ -274,16 +273,38 @@ interface ArchiveCardProps {
   onRename: (e: React.MouseEvent, item: HistoryItem) => void;
 }
 
+/** 从 size 字段推断宽高比（CSS aspect-ratio 字符串）
+ *  支持 "4K-16:9" / "4K-1:1" / "1024x1024" / "1792x1024" 等格式 */
+function sizeToAspectRatio(size?: string): string {
+  if (!size) return '1 / 1';
+  // "4K-16:9" → 16:9
+  const ratioMatch = size.match(/(\d+):(\d+)/);
+  if (ratioMatch) {
+    const w = parseInt(ratioMatch[1], 10);
+    const h = parseInt(ratioMatch[2], 10);
+    if (w > 0 && h > 0) return `${w} / ${h}`;
+  }
+  // "1024x1024" → 1024/1024
+  const pxMatch = size.match(/(\d+)x(\d+)/);
+  if (pxMatch) {
+    const w = parseInt(pxMatch[1], 10);
+    const h = parseInt(pxMatch[2], 10);
+    if (w > 0 && h > 0) return `${w} / ${h}`;
+  }
+  return '1 / 1';
+}
+
 function ArchiveCard({
   item, idx, onOpen, onDownload, onDelete, onStar, onRename,
 }: ArchiveCardProps) {
+  const aspectRatio = sizeToAspectRatio(item.size);
   return (
     <div
       className="group cursor-pointer animate-fade-up"
       style={{ animationDelay: `${idx * 30}ms` }}
       onClick={() => onOpen(item)}
     >
-      <div className="relative aspect-square overflow-hidden">
+      <div className="relative overflow-hidden" style={{ aspectRatio }}>
         {item.isVideo ? (
           <div className="w-full h-full bg-paper-200/10 flex items-center justify-center">
             <Film size={36} className="text-paper-200" strokeWidth={1} />

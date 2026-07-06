@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, isVideoMode, isChatMode } from '@/store/useStore';
+import { useSettings } from '@/store/useSettings';
 import { generateImage, createVideoTask, pollVideoResult } from '@/utils/api';
 import { makeThumbnail } from '@/utils/thumbnail';
+import { downloadFromUrl } from '@/utils/download';
 import ModeSwitch from '@/components/ModeSwitch';
 import SizeSelector from '@/components/SizeSelector';
 import ImageUpload from '@/components/ImageUpload';
@@ -12,20 +14,26 @@ import ChatPanel from '@/components/ChatPanel';
 import Wallpaper from '@/components/Wallpaper';
 import Toast from '@/components/Toast';
 import Logo from '@/components/Logo';
-import { ArrowUpRight, Archive } from 'lucide-react';
+import { ArrowUpRight, Archive, Settings } from 'lucide-react';
 
 export default function Home() {
   const navigate = useNavigate();
   const {
     mode, prompt, size, referenceImage, multiImages,
     isGenerating, setPrompt, setGenerating,
-    setResultImageUrl, setResultVideoUrl, setVideoPollingId,
+    setResultImageUrl, setResultVideoUrl, setVideoPollingId, setVideoProgress,
     setError, addToHistory, history,
   } = useStore();
 
   const isVideo = isVideoMode(mode);
   const isChat = isChatMode(mode);
   const [time, setTime] = useState(new Date());
+
+  // 启动时应用默认图像尺寸设置
+  useEffect(() => {
+    const { defaultImageSize } = useSettings.getState();
+    useStore.getState().setSize(defaultImageSize as import('@/store/useStore').ImageSize);
+  }, []);
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -42,23 +50,38 @@ export default function Home() {
     setError(null);
     setResultImageUrl(null);
     setResultVideoUrl(null);
+    setVideoProgress(null, null);
 
     try {
       if (isVideo) {
+        const { defaultVideoResolution } = useSettings.getState();
+        setVideoProgress(0, 'queued');
         const videoId = await createVideoTask(
           mode as 'text2video' | 'img2video' | 'multi2video',
           prompt.trim(),
           referenceImage,
-          multiImages.map((img) => img.base64)
+          multiImages.map((img) => img.base64),
+          defaultVideoResolution
         );
         setVideoPollingId(Date.now());
-        const videoUrl = await pollVideoResult(videoId);
+        const videoUrl = await pollVideoResult(videoId, (status, progress) => {
+          setVideoProgress(progress ?? null, status);
+        });
         setResultVideoUrl(videoUrl);
         setVideoPollingId(null);
+        setVideoProgress(null, null);
         addToHistory({
           id: crypto.randomUUID(), prompt: prompt.trim(), mode, size,
           imageUrl: videoUrl, isVideo: true, starred: false, createdAt: Date.now(),
         });
+        // 自动下载（设置中开启时）
+        const { autoDownload } = useSettings.getState();
+        if (autoDownload) {
+          try {
+            await downloadFromUrl(videoUrl, { filenamePrefix: '工坊-影像', prompt: prompt.trim() });
+            useStore.getState().setToast({ kind: 'success', message: '已自动下载' });
+          } catch { /* 下载失败不阻塞主流程 */ }
+        }
       } else {
         const imageUrl = await generateImage(mode, prompt.trim(), size, referenceImage);
         setResultImageUrl(imageUrl);
@@ -68,14 +91,23 @@ export default function Home() {
           id: crypto.randomUUID(), prompt: prompt.trim(), mode, size,
           imageUrl, thumbnail: thumbnail || undefined, starred: false, createdAt: Date.now(),
         });
+        // 自动下载（设置中开启时）
+        const { autoDownload } = useSettings.getState();
+        if (autoDownload) {
+          try {
+            await downloadFromUrl(imageUrl, { filenamePrefix: '工坊-图像', prompt: prompt.trim() });
+            useStore.getState().setToast({ kind: 'success', message: '已自动下载' });
+          } catch { /* 下载失败不阻塞主流程 */ }
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '生成失败，请重试');
       setVideoPollingId(null);
+      setVideoProgress(null, null);
     } finally {
       setGenerating(false);
     }
-  }, [mode, prompt, size, referenceImage, multiImages, isVideo, setGenerating, setResultImageUrl, setResultVideoUrl, setVideoPollingId, setError, addToHistory]);
+  }, [mode, prompt, size, referenceImage, multiImages, isVideo, setGenerating, setResultImageUrl, setResultVideoUrl, setVideoPollingId, setVideoProgress, setError, addToHistory]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !isGenerating) {
@@ -150,6 +182,22 @@ export default function Home() {
                   <Archive size={11} strokeWidth={1.5} className="text-paper-200" />
                   <span className="font-mono text-[10px] tracking-widest text-paper-200/70 tabular-nums">
                     {String(history.length).padStart(3, '0')} 件
+                  </span>
+                </div>
+              </button>
+              <button
+                onClick={() => navigate('/settings')}
+                className="group flex flex-col items-end gap-1.5 transition-opacity duration-400 hover:opacity-70"
+                title="设置"
+              >
+                <div className="flex items-baseline gap-2">
+                  <span className="font-mono text-[10px] tracking-widest text-paper-50/55">N°05</span>
+                  <span className="font-display text-base tracking-wider text-paper-50">设置</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Settings size={11} strokeWidth={1.5} className="text-paper-200" />
+                  <span className="font-mono text-[10px] tracking-widest text-paper-200/70">
+                    自定义
                   </span>
                 </div>
               </button>
